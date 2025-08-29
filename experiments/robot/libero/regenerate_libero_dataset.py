@@ -37,8 +37,10 @@ from libero.libero import benchmark
 from experiments.robot.libero.libero_utils import (
     get_libero_dummy_action,
     get_libero_env,
+    get_libero_env_general
 )
-
+import pdb
+import pybullet as p
 
 IMAGE_RESOLUTION = 256
 
@@ -98,8 +100,12 @@ def main(args):
     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
         # Get task in suite
         task = task_suite.get_task(task_id)
-        env, task_description = get_libero_env(task, "llava", resolution=IMAGE_RESOLUTION)
-
+       # env, task_description = get_libero_env(task, "llava", resolution=IMAGE_RESOLUTION)
+        kwargs = {
+            "robots":["Panda"],
+            "controller":"IK_POSE"
+        }
+        env, task_description = get_libero_env_general(task, "llava", resolution=IMAGE_RESOLUTION, **kwargs)    
         # Get dataset for task
         orig_data_path = os.path.join(args.libero_raw_data_dir, f"{task.name}_demo.hdf5")
         assert os.path.exists(orig_data_path), f"Cannot find raw data file {orig_data_path}."
@@ -116,12 +122,14 @@ def main(args):
             demo_data = orig_data[f"demo_{i}"]
             orig_actions = demo_data["actions"][()]
             orig_states = demo_data["states"][()]
+            orig_ee_states = demo_data["obs"]["ee_states"][()]
 
             # Reset environment, set initial state, and wait a few steps for environment to settle
             env.reset()
             env.set_init_state(orig_states[0])
+            dummy_ik_input = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
             for _ in range(10):
-                obs, reward, done, info = env.step(get_libero_dummy_action("llava"))
+                obs, reward, done, info = env.step(dummy_ik_input)
 
             # Set up new data lists
             states = []
@@ -134,28 +142,40 @@ def main(args):
             eye_in_hand_images = []
 
             # Replay original demo actions in environment and record observations
-            for _, action in enumerate(orig_actions):
+            #for _, action in enumerate(orig_actions):
+            for i, ee_state in enumerate(orig_ee_states):
+                
                 # Skip transitions with no-op actions
-                prev_action = actions[-1] if len(actions) > 0 else None
-                if is_noop(action, prev_action):
-                    print(f"\tSkipping no-op action: {action}")
-                    num_noops += 1
-                    continue
+                # prev_action = actions[-1] if len(actions) > 0 else None
+                # if is_noop(action, prev_action):
+                #     print(f"\tSkipping no-op action: {action}")
+                #     num_noops += 1
+                #     continue
 
                 if states == []:
                     # In the first timestep, since we're using the original initial state to initialize the environment,
                     # copy the initial state (first state in episode) over from the original HDF5 to the new one
                     states.append(orig_states[0])
                     robot_states.append(demo_data["robot_states"][0])
+                    # ee_state_t = ee_state[:3]
+                    # ee_state_rot = ee_state[3:]
+                    # quat = p.getQuaternionFromEuler(ee_state_rot)  # returns (x, y, z, w)
+                    axis, angle = p.getAxisAngleFromQuaternion(list(obs["robot0_eef_quat"]))
+                    axis_angle_vec = [a * angle for a in axis]   
+                    prev_ee_state = np.array(list(obs["robot0_eef_pos"])+axis_angle_vec+[0.])
                 else:
                     # For all other timesteps, get state from environment and record it
                     states.append(env.sim.get_state().flatten())
                     robot_states.append(
                         np.concatenate([obs["robot0_gripper_qpos"], obs["robot0_eef_pos"], obs["robot0_eef_quat"]])
                     )
+                    pdb.set_trace()
+                    axis, angle = p.getAxisAngleFromQuaternion(list(obs["robot0_eef_quat"]))
+                    axis_angle_vec = [a * angle for a in axis]   
+                    prev_ee_state = np.array(list(obs["robot0_eef_pos"])+axis_angle_vec+[0.])
 
                 # Record original action (from demo)
-                actions.append(action)
+               # actions.append(action)
 
                 # Record data returned by environment
                 if "robot0_gripper_qpos" in obs:
@@ -173,7 +193,25 @@ def main(args):
                 eye_in_hand_images.append(obs["robot0_eye_in_hand_image"])
 
                 # Execute demo action in environment
-                obs, reward, done, info = env.step(action.tolist())
+                # eef_pose = orig_ee_states[:3]
+                # eef_ori = T.quat2axisangle(orig_ee_states[3:])
+                eef_pos = ee_state[:3]
+                eef_ori = ee_state[3:]
+                quat = p.getQuaternionFromEuler(eef_ori)  # returns (x, y, z, w)
+                axis, angle = p.getAxisAngleFromQuaternion(quat)
+                axis_angle_vec = [a * angle for a in axis] 
+
+                ee_state_np = np.array(list(eef_pos) + axis_angle_vec + [0.0])
+
+                ee_state_input = ee_state_np - prev_ee_state  
+                for num_iter in range(10):
+                    pdb.set_trace()
+                    obs, reward, done, info = env.step(ee_state_input)
+                    axis, angle = p.getAxisAngleFromQuaternion(list(obs["robot0_eef_quat"]))
+                    axis_angle_vec = [a * angle for a in axis]   
+                    prev_ee_state = np.array(list(obs["robot0_eef_pos"])+axis_angle_vec+[0.])  
+                    ee_state_input = ee_state_np - prev_ee_state
+
 
             # At end of episode, save replayed trajectories to new HDF5 files (only keep successes)
             if done:

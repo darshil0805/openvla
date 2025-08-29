@@ -118,9 +118,9 @@ def main(args):
             orig_states = demo_data["states"][()]
 
             # Reset environment, set initial state, and wait a few steps for environment to settle
-            pdb.set_trace()
             env.reset()
-            env.set_init_state(orig_states[0])
+            pdb.set_trace()
+          #  env.set_init_state(orig_states[0])
             for _ in range(10):
                 obs, reward, done, info = env.step(get_libero_dummy_action("llava"))
 
@@ -135,7 +135,7 @@ def main(args):
             eye_in_hand_images = []
 
             # Replay original demo actions in environment and record observations
-            for _, action in enumerate(orig_actions):
+            #for _, action in enumerate(orig_actions):
                 # Skip transitions with no-op actions
                 prev_action = actions[-1] if len(actions) > 0 else None
                 if is_noop(action, prev_action):
@@ -174,7 +174,8 @@ def main(args):
                 eye_in_hand_images.append(obs["robot0_eye_in_hand_image"])
 
                 # Execute demo action in environment
-                obs, reward, done, info = env.step(action.tolist())
+                # pdb.set_trace()
+                # obs, reward, done, info = env.step(action.tolist())
 
             # At end of episode, save replayed trajectories to new HDF5 files (only keep successes)
             if done:
