@@ -1,3 +1,7 @@
+## Follow the instruction of LIBERO Setup to get the code running
+Code to check is in experiments/robot/libero/regenerate_libero_dataset.py
+
+
 # OpenVLA: An Open-Source Vision-Language-Action Model
 
 [![arXiv](https://img.shields.io/badge/arXiv-2406.09246-df2a2a.svg?style=for-the-badge)](https://arxiv.org/abs/2406.09246)
