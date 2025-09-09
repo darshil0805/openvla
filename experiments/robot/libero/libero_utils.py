@@ -8,16 +8,17 @@ import numpy as np
 import tensorflow as tf
 from libero.libero import get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
+import pdb
 
 from experiments.robot.robot_utils import (
     DATE,
     DATE_TIME,
 )
 
-def get_libero_env_kinova(task, model_family, resolution=256):
+def get_libero_env_general(task, model_family, resolution=256, **kwargs):
     task_description = task.language
     task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
-    env_args = {"bddl_file_name": task_bddl_file, "camera_heights": resolution, "camera_widths": resolution,"robots":["Kinova"]}
+    env_args = {"bddl_file_name": task_bddl_file, "camera_heights": resolution, "camera_widths": resolution, **kwargs}
     env = OffScreenRenderEnv(**env_args)
     env.seed(0)  # IMPORTANT: seed seems to affect object positions even when using fixed initial state
     return env, task_description

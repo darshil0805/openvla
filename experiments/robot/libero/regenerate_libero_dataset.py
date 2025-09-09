@@ -169,7 +169,6 @@ def main(args):
                     robot_states.append(
                         np.concatenate([obs["robot0_gripper_qpos"], obs["robot0_eef_pos"], obs["robot0_eef_quat"]])
                     )
-                    pdb.set_trace()
                     axis, angle = p.getAxisAngleFromQuaternion(list(obs["robot0_eef_quat"]))
                     axis_angle_vec = [a * angle for a in axis]   
                     prev_ee_state = np.array(list(obs["robot0_eef_pos"])+axis_angle_vec+[0.])
@@ -202,15 +201,15 @@ def main(args):
                 axis_angle_vec = [a * angle for a in axis] 
 
                 ee_state_np = np.array(list(eef_pos) + axis_angle_vec + [0.0])
-
-                ee_state_input = ee_state_np - prev_ee_state  
-                for num_iter in range(10):
-                    pdb.set_trace()
+                ee_state_input = ee_state_np - prev_ee_state
+                ee_state_input = ee_state_input/10
+                pdb.set_trace()
+                for num_iter in range(100):
                     obs, reward, done, info = env.step(ee_state_input)
                     axis, angle = p.getAxisAngleFromQuaternion(list(obs["robot0_eef_quat"]))
                     axis_angle_vec = [a * angle for a in axis]   
                     prev_ee_state = np.array(list(obs["robot0_eef_pos"])+axis_angle_vec+[0.])  
-                    ee_state_input = ee_state_np - prev_ee_state
+                    ee_state_input = (ee_state_np - prev_ee_state)/10
 
 
             # At end of episode, save replayed trajectories to new HDF5 files (only keep successes)
